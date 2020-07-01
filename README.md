@@ -1,2 +1,2 @@
 # royo-stat
-Roll your own MQTT thermostat designed primarily to be used with OpenHAB but can be used with any home automation system.
+Roll your own MQTT thermostat designed primarily to be used with OpenHAB but can be used with any home automation system. The thermostat is an ESP8266 loaded with Tasmota and a custom script, a 4-channel relay, and an SI7021 temperature/humidity sensor. No user interface is included with the thermostat. The UI is through OpenHAB UI or HABPanel. Repository includes Tasmota custom script; OpenHAB items, things, and rules; and HABPanel widget.
