@@ -1,0 +1,99 @@
+rule "HVAC Schedule"
+when
+        System started or
+        Time cron "0 5 0 * * ?" or
+        Item HVAC_Timer_FF_Home_Hr changed or
+        Item HVAC_Timer_FF_Home_Min changed or
+        Item HVAC_Timer_FF_Home_SP_Heat changed or
+        Item HVAC_Timer_FF_Home_SP_Cool changed or
+        Item HVAC_Timer_FF_Away_Hr changed or
+        Item HVAC_Timer_FF_Away_Min changed or
+        Item HVAC_Timer_FF_Away_SP_Heat changed or
+        Item HVAC_Timer_FF_Away_SP_Cool changed or
+        Item HVAC_Timer_FF_Home_Hr changed or
+        Item HVAC_Timer_SF_Home_Min changed or
+        Item HVAC_Timer_SF_Home_SP_Heat changed or
+        Item HVAC_Timer_SF_Home_SP_Cool changed or
+        Item HVAC_Timer_SF_Away_Hr changed or
+        Item HVAC_Timer_SF_Away_Min changed or
+        Item HVAC_Timer_SF_Away_SP_Heat changed or
+        Item HVAC_Timer_SF_Away_SP_Cool changed
+then
+        var int ffHomeHour = (HVAC_Timer_FF_Home_Hr.state as DecimalType).intValue()
+        var int ffHomeMinute = (HVAC_Timer_FF_Home_Min.state as DecimalType).intValue()
+        var int ffAwayHour = (HVAC_Timer_FF_Away_Hr.state as DecimalType).intValue()
+        var int ffAwayMinute = (HVAC_Timer_FF_Away_Min.state as DecimalType).intValue()
+        var int sfHomeHour = (HVAC_Timer_SF_Home_Hr.state as DecimalType).intValue()
+        var int sfHomeMinute = (HVAC_Timer_SF_Home_Min.state as DecimalType).intValue()
+        var int sfAwayHour = (HVAC_Timer_SF_Away_Hr.state as DecimalType).intValue()
+        var int sfAwayMinute = (HVAC_Timer_SF_Away_Min.state as DecimalType).intValue()
+
+        // work out when the timer is to fire - start from midnight
+        //Actually start at 03:00 and then subtract three hours to account for DST
+        var DateTime ffHomeTime = parse(now.getYear() + "-" + now.getMonthOfYear() + "-" + now.getDayOfMonth() + "T03:00")
+        var DateTime ffAwayTime = parse(now.getYear() + "-" + now.getMonthOfYear() + "-" + now.getDayOfMonth() + "T03:00")
+        var DateTime sfHomeTime = parse(now.getYear() + "-" + now.getMonthOfYear() + "-" + now.getDayOfMonth() + "T03:00")
+        var DateTime sfAwayTime = parse(now.getYear() + "-" + now.getMonthOfYear() + "-" + now.getDayOfMonth() + "T03:00")
+
+        var Timer ffHomeTimer = null
+        var Timer ffAwayTimer = null
+        var Timer sfHomeTimer = null
+        var Timer sfAwayTimer = null
+
+        if (ffHomeTimer !== null)
+                ffHomeTimer.cancel()
+
+        if (ffAwayTimer !== null)
+                ffAwayTimer.cancel()
+
+        if (sfHomeTimer !== null)
+                sfHomeTimer.cancel()
+
+        if (sfAwayTimer !== null)
+                sfAwayTimer.cancel()
+
+
+        // add the number of hours and minutes selected
+        //Subtract 3 hours as part of the DST workaround above
+        ffHomeTime = ffHomeTime.minusHours(3).plusHours(ffHomeHour).plusMinutes(ffHomeMinute)
+        ffAwayTime = ffAwayTime.minusHours(3).plusHours(ffAwayHour).plusMinutes(ffAwayMinute)
+        sfHomeTime = sfHomeTime.minusHours(3).plusHours(sfHomeHour).plusMinutes(sfHomeMinute)
+        sfAwayTime = sfAwayTime.minusHours(3).plusHours(sfAwayHour).plusMinutes(sfAwayMinute)
+
+
+        // if we have already past the on or off time then set it for the following day
+        if (ffHomeTime.beforeNow)
+                ffHomeTime = ffHomeTime.plusDays(1)
+
+        if (ffAwayTime.beforeNow)
+                ffAwayTime = ffAwayTime.plusDays(1)
+
+        if (sfHomeTime.beforeNow)
+                sfHomeTime = sfHomeTime.plusDays(1)
+
+        if (sfAwayTime.beforeNow)
+                sfAwayTime = sfAwayTime.plusDays(1)
+
+
+        // create a timer to execute the on/off timer at the specified time
+        ffHomeTimer = createTimer(ffHomeTime, [ |
+                HVAC_Setpoint_Heat_FF.sendCommand(HVAC_Timer_FF_Home_SP_Heat.state)
+                HVAC_Setpoint_Cool_FF.sendCommand(HVAC_Timer_FF_Home_SP_Cool.state)
+        ])
+
+        ffAwayTimer = createTimer(ffAwayTime, [ |
+                HVAC_Setpoint_Heat_FF.sendCommand(HVAC_Timer_FF_Away_SP_Heat.state)
+                HVAC_Setpoint_Cool_FF.sendCommand(HVAC_Timer_FF_Away_SP_Cool.state)
+        ])
+
+        sfHomeTimer = createTimer(sfHomeTime, [ |
+                HVAC_Setpoint_Heat_SF.sendCommand(HVAC_Timer_SF_Home_SP_Heat.state)
+                HVAC_Setpoint_Cool_SF.sendCommand(HVAC_Timer_SF_Home_SP_Cool.state)
+        ])
+
+        sfAwayTimer = createTimer(sfAwayTime, [ |
+                HVAC_Setpoint_Heat_SF.sendCommand(HVAC_Timer_SF_Away_SP_Heat.state)
+                HVAC_Setpoint_Cool_SF.sendCommand(HVAC_Timer_SF_Away_SP_Cool.state)
+        ])
+
+end
