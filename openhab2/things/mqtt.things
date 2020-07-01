@@ -1,0 +1,28 @@
+Bridge mqtt:broker:unsecure [ host="x.x.x.x", secure=false ]
+{
+    Thing topic temp_sensors "Temperature Sensor Topic" {
+    Channels:
+        Type number : hvac_temp [ stateTopic="tele/myhome/hvac/tstat/SENSOR", transformationPattern="JSONPATH:$.SI7021.Temperature" ]
+        Type number : hvac_rh [ stateTopic="tele/myhome/hvac/tstat/SENSOR", transformationPattern="JSONPATH:$.SI7021.Humidity" ]
+        Type number : hvac_temp_mbr [ stateTopic="tele/myhome/snsr/masterbr/SENSOR", transformationPattern="JSONPATH:$.SI7021.Temperature" ]
+        Type number : hvac_rh_mbr [ stateTopic="tele/myhome/snsr/masterbr/SENSOR", transformationPattern="JSONPATH:$.SI7021.Humidity" ]
+        Type string : hvac_snsr_mbr_status [ stateTopic="tele/myhome/snsr/masterbr/LWT" ]
+    }
+
+    Thing topic thermostat_vars "Thermostat Variables Topic" {
+    Channels:
+        Type number : var_hvac_mode [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">M=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.M" ]
+        Type number : var_hvac_setpoint_heat [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">H=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.H" ]
+        Type number : var_hvac_setpoint_cool [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">C=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.C" ]
+        Type number : var_hvac_deadband [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">D=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.D" ]
+        Type number : var_hvac_fan [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">F=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.F" ]
+        Type number : var_hvac_min_on_heat [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">OH=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.OH" ]
+        Type number : var_hvac_min_off_heat [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">FH=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.FH" ]
+        Type number : var_hvac_min_on_cool [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">OC=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.OC" ]
+        Type number : var_hvac_min_off_cool [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">FC=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.FC" ]
+        Type number : var_hvac_auto_status [ stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.A" ]
+        Type number : var_hvac_status [ stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.S" ]
+        //Type number : var_hvac_btwn_sts_heat [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">h=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.BH" ]
+        //Type number : var_hvac_btwn_sts_cool [ commandTopic="cmnd/myhome/hvac/tstat/Script", formatBeforePublish=">k=%s", stateTopic="tele/myhome/hvac/tstat/TS", transformationPattern="JSONPATH:$.BC" ]
+    }
+}
