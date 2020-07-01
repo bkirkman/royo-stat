@@ -1,0 +1,67 @@
+//First Floor Thermostat Values
+Number  First_Floor_Dew_Point  "1st Fl Dew Point [%.1f °F]" <water>
+Number  First_Floor_RH  "1st Fl RH [%s %%]" <humidity> { channel="mqtt:topic:unsecure:temp_sensors:hvac_rh" }
+Number  First_Floor_Temp  "1st Fl Temperature [%.1f °F]" <temperature> { channel="mqtt:topic:unsecure:temp_sensors:hvac_temp" }
+
+//Second Floor Rempte Sensor Values. Also track 2nd floor sensor status to determine if sensor goes offline.
+//Uses LWT of sensor. See mqtt.things. If sensor goes offline, hvac.rules will fall back to first floor settings.
+Number  Second_Floor_Dew_Point  "2nd Fl Dew Point [%.1f °F]" <water>
+Number  Second_Floor_RH  "2nd Fl RH [%s %%]" <humidity> { channel="mqtt:topic:unsecure:temp_sensors:hvac_rh_mbr" }
+Number  Second_Floor_Temp  "2nd Fl Temperature [%.1f °F]" <temperature> { channel="mqtt:topic:unsecure:temp_sensors:hvac_temp_mbr" }
+String  Second_Floor_Sensor_Status  "2nd Fl Sensor Status [%s]" <snsrstatus> { channel="mqtt:topic:unsecure:temp_sensors:hvac_snsr_mbr_status" }
+
+//Active zone values arbitrated by hvac.rules
+Number  Active_Temp  "Active Temperature [%s °F]" <temperature>
+Number  Active_RH  "Active RH [%s %%]" <humidity>
+Number  Active_Setpoint  "Active Setpoint [%s °F]" <temperature>
+Number  Active_Setpoint_Heat  "Active Heating Setpoint [%s °F]" <temperature>
+Number  Active_Setpoint_Cool  "Active Cooling Setpoint [%s °F]" <temperature>
+String  Active_Zone  "Active Zone [%s]" <house>
+
+//Setpoint values controlled by UI (HABPanel, mobile, etc) that will be arbitrated to the active values and sent via MQTT to the thermostat
+Number  HVAC_Setpoint_Heat_FF  "1st Fl Htg SP [%s °F]" <temperature_hot>
+Number  HVAC_Setpoint_Cool_FF  "1st Fl Clg SP [%s °F]" <temperature_cold>
+Number  HVAC_Setpoint_Heat_SF  "2nd Fl Htg SP [%s °F]" <temperature_hot>
+Number  HVAC_Setpoint_Cool_SF  "2nd Fl Clg SP [%s °F]" <temperature_cold>
+
+//Values that are r/w via MQTT to/from thermostat for control and display
+Number  HVAC_Mode  "H/C Mode [%s]" <hvac_mode> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_mode" }
+Number  HVAC_Setpoint_Heat  "Heating Setpoint" <temperature_hot> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_setpoint_heat" }
+Number  HVAC_Setpoint_Cool  "Cooling Setpoint" <temperature_cold> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_setpoint_cool" }
+Number  HVAC_Deadband  "H/C Deadband [%s]" <temperature> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_deadband" }
+Number  HVAC_Fan  "Fan Mode" <fan> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_fan" }
+Number  HVAC_Min_On_Heat  "Min On Time Heat(minutes)" <time> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_min_on_heat" }
+Number  HVAC_Min_Off_Heat  "Min Off Time Heat(minutes)" <time> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_min_off_heat" }
+Number  HVAC_Min_On_Cool  "Min On Time Cool(minutes)" <time> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_min_on_cool" }
+Number  HVAC_Min_Off_Cool  "Min Off Time Cool(minutes)" <time> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_min_off_cool" }
+Number  HVAC_Auto_Status  "Auto Mode Status [%s]" <flow> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_auto_status" }
+Number  HVAC_Status  "Operating Status [MAP(hvac_status.map):%s]" <flow> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_status" }
+//Had to chop out "between starts" delay because script got too large in Tasmota
+//Number  HVAC_Btwn_Sts_Heat  "Between Starts Time Heat(minutes)" <time> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_btwn_sts_heat" }
+//Number  HVAC_Btwn_Sts_Cool  "Between Starts Time Cool(minutes)" <time> { channel="mqtt:topic:unsecure:thermostat_vars:var_hvac_btwn_sts_cool" }
+
+//Track filter hours
+Number  HVAC_Filter_Hours  "Filter Hours [%.1f]" <time>
+Number  HVAC_Filter_Minutes  "Filter Minutes [%.1f]" <time>
+Switch  HVAC_Filter_Reset    "Reset Filter Hours"           <switch>
+Switch  HVAC_Filter_Reset_Request
+Switch  HVAC_Filter_Reset_Confirm  "Confirm Filter Hour Reset"    <switch>
+
+//Create items for scheduled times and setpoints. Just a simple home/away schedule based on TOD.
+//Could scale to a 7-day function (with a lot of work) or use some other location-based criteria.
+Number  HVAC_Timer_FF_Home_Hr "1st Fl Home Hr [%02d]" <time_on>
+Number  HVAC_Timer_FF_Home_Min "1st Fl Home Min [%02d]" <time_on>
+Number  HVAC_Timer_FF_Home_SP_Heat "1st Fl Home Htg SP [%s °F]" <temperature_hot>
+Number  HVAC_Timer_FF_Home_SP_Cool "1st Fl Home Clg SP [%s °F]" <temperature_cold>
+Number  HVAC_Timer_FF_Away_Hr "1st Fl Away Hr [%02d]" <time>
+Number  HVAC_Timer_FF_Away_Min "1st Fl Away Min [%02d]" <time>
+Number  HVAC_Timer_FF_Away_SP_Heat "1st Fl Away Htg SP [%s °F]" <temperature_hot>
+Number  HVAC_Timer_FF_Away_SP_Cool "1st Fl Away Clg SP [%s °F]" <temperature_cold>
+Number  HVAC_Timer_SF_Home_Hr "2nd Fl Home Hr [%02d]" <time_on>
+Number  HVAC_Timer_SF_Home_Min "2nd Fl Home Min [%02d]" <time_on>
+Number  HVAC_Timer_SF_Home_SP_Heat "2nd Fl Home Htg SP [%s °F]" <temperature_hot>
+Number  HVAC_Timer_SF_Home_SP_Cool "2nd Fl Home Clg SP [%s °F]" <temperature_cold>
+Number  HVAC_Timer_SF_Away_Hr "2nd Fl Away Hr [%02d]" <time>
+Number  HVAC_Timer_SF_Away_Min "2nd Fl Away Min [%02d]" <time>
+Number  HVAC_Timer_SF_Away_SP_Heat "2nd Fl Away Htg SP [%s °F]" <temperature_hot>
+Number  HVAC_Timer_SF_Away_SP_Cool "2nd Fl Away Clg SP [%s °F]" <temperature_cold>
