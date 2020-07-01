@@ -3,7 +3,7 @@ Number  First_Floor_Dew_Point  "1st Fl Dew Point [%.1f °F]" <water>
 Number  First_Floor_RH  "1st Fl RH [%s %%]" <humidity> { channel="mqtt:topic:unsecure:temp_sensors:hvac_rh" }
 Number  First_Floor_Temp  "1st Fl Temperature [%.1f °F]" <temperature> { channel="mqtt:topic:unsecure:temp_sensors:hvac_temp" }
 
-//Second Floor Rempte Sensor Values. Also track 2nd floor sensor status to determine if sensor goes offline.
+//Second Floor Remote Sensor Values. Also track 2nd floor sensor status to determine if sensor goes offline.
 //Uses LWT of sensor. See mqtt.things. If sensor goes offline, hvac.rules will fall back to first floor settings.
 Number  Second_Floor_Dew_Point  "2nd Fl Dew Point [%.1f °F]" <water>
 Number  Second_Floor_RH  "2nd Fl RH [%s %%]" <humidity> { channel="mqtt:topic:unsecure:temp_sensors:hvac_rh_mbr" }
