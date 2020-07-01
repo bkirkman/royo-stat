@@ -1,0 +1,295 @@
+var Number mqttCounter = 0
+
+rule "Dew Point Rules"
+when
+  System started or
+  Item First_Floor_Temp changed or
+  Item First_Floor_RH changed
+then
+  var Number tempC
+  var Number alphaLn
+  var Number alpha
+  var Number dewPoint
+
+  tempC = ((First_Floor_Temp.state as DecimalType)-32)*5/9
+  alphaLn = Math::log(Double::parseDouble(First_Floor_RH.state.toString)/100)
+  alpha = alphaLn+17.62*tempC/(243.12+tempC)
+  dewPoint = (243.12*alpha)/(17.62-alpha)*9/5+32
+  First_Floor_Dew_Point.postUpdate(dewPoint)
+end
+
+
+rule "Second Floor Dew Point Rules"
+when
+  System started or
+  Item Second_Floor_Temp changed or
+  Item Second_Floor_RH changed
+then
+  var Number tempC
+  var Number alphaLn
+  var Number alpha
+  var Number dewPoint
+
+  tempC = ((Second_Floor_Temp.state as DecimalType)-32)*5/9
+  alphaLn = Math::log(Double::parseDouble(Second_Floor_RH.state.toString)/100)
+  alpha = alphaLn+17.62*tempC/(243.12+tempC)
+  dewPoint = (243.12*alpha)/(17.62-alpha)*9/5+32
+  Second_Floor_Dew_Point.postUpdate(dewPoint)
+end
+
+
+
+  //mqttActions.publishMQTT(deviceID + "/Script/heartbeat", mqttCounter)
+  //mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">hb=" + mqttCounter)
+  //mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">ab=" + mqttCounter)
+  //mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">v=" + activeTemp)
+
+
+//Set active zone based on deviation from setpoint and update thermostat.
+//Determine arbitration on any setpoint change or on sensor status change.
+//Evaluate every 30 seconds as temperatures fluctuate
+rule "Active Zone"
+when
+  System started or
+  //Item First_Floor_Temp changed or
+  //Item Second_Floor_Temp changed or
+  Item Second_Floor_Sensor_Status changed or
+  Item HVAC_Setpoint_Heat_FF changed or
+  Item HVAC_Setpoint_Cool_FF changed or
+  Item HVAC_Setpoint_Heat_SF changed or
+  Item HVAC_Setpoint_Cool_SF changed or
+  Item HVAC_Mode changed or
+  Item HVAC_Status changed or
+  Item HVAC_Auto_Status changed or
+  Time cron "0/30 0/1 * 1/1 * ? *"
+then
+  var Number firstFloorErr
+  var Number secondFloorErr
+  var Number activeTemp
+  var Number activeRH
+  var Number activeSP
+  var Number activeSP_Htg
+  var Number activeSP_Clg
+  var String activeZone
+  var Number autoStatus
+  var Number deadBand
+  var Number Temp_FF
+  var Number Temp_SF
+  var Number RH_FF
+  var Number RH_SF
+  var Number Htg_SP_FF
+  var Number Clg_SP_FF
+  var Number Htg_SP_SF
+  var Number Clg_SP_SF
+  var String Status_SF
+  var String deviceID
+  val mqttActions = getActions("mqtt","mqtt:broker:unsecure")
+  deviceID = "myhome/hvac/tstat"
+
+  //Get Item values and assign to variables for easier coding
+  autoStatus = (HVAC_Auto_Status.state as DecimalType)
+  deadBand = (HVAC_Deadband.state as DecimalType)
+  Temp_FF = (First_Floor_Temp.state as DecimalType)
+  Temp_SF = (Second_Floor_Temp.state as DecimalType)
+  RH_FF = (First_Floor_RH.state as DecimalType)
+  RH_SF = (Second_Floor_RH.state as DecimalType)
+  Htg_SP_FF = (HVAC_Setpoint_Heat_FF.state as DecimalType)
+  Clg_SP_FF = (HVAC_Setpoint_Cool_FF.state as DecimalType)
+  Htg_SP_SF = (HVAC_Setpoint_Heat_SF.state as DecimalType)
+  Clg_SP_SF = (HVAC_Setpoint_Cool_SF.state as DecimalType)
+  Status_SF = (Second_Floor_Sensor_Status.state.toString)
+
+
+  //make sure setpoints are spread
+  //spread heating setpoints when in cooling mode
+  //spread cooling setpoint when not in cooling mode
+  //round up or down per mode to nearest 0.5
+  if (autoStatus == 2) {
+    if (Htg_SP_FF > (Clg_SP_FF - deadBand - 1)) {
+      Htg_SP_FF = (Math::floor(((Clg_SP_FF - deadBand - 1) * 2).floatValue) / 2)
+      HVAC_Setpoint_Heat_FF.postUpdate(Htg_SP_FF)
+    }
+    if (Htg_SP_SF > (Clg_SP_SF - deadBand - 1)) {
+      Htg_SP_SF = (Math::floor(((Clg_SP_SF - deadBand - 1) * 2).floatValue) / 2)
+      HVAC_Setpoint_Heat_SF.postUpdate(Htg_SP_SF)
+    }
+  } else {
+    if (Clg_SP_FF < (Htg_SP_FF + deadBand + 1)) {
+      Clg_SP_FF = (Math::ceil(((Htg_SP_FF + deadBand + 1) * 2).floatValue) / 2)
+      HVAC_Setpoint_Cool_FF.postUpdate(Clg_SP_FF)
+    }
+    if (Clg_SP_SF < (Htg_SP_SF + deadBand + 1)) {
+      Clg_SP_SF = (Math::ceil(((Htg_SP_SF + deadBand + 1) * 2).floatValue) / 2)
+      HVAC_Setpoint_Cool_SF.postUpdate(Clg_SP_SF)
+    }
+  }
+
+
+  //Determine error based on heat/cool mode to use heating or cooling setpoint
+  if (autoStatus == 2) {
+    firstFloorErr = Temp_FF - Clg_SP_FF
+    secondFloorErr = Temp_SF - Clg_SP_SF
+  } else {
+    firstFloorErr = Temp_FF - Htg_SP_FF
+    secondFloorErr = Temp_SF - Htg_SP_SF
+  }
+
+
+  //Arbitrate which sensor and setpoint to use.
+  //Calculate error as MV - SP (measured value minus setpoint)
+  //In cooling, largest error wins (i.e. greatest above setpoint)
+  //In heating, smallest error wins (i.e. greatest below setpoint)
+  //If second floor sensor not communicating, only use first floor sensor and setpoints.
+  if (autoStatus == 2) {
+    if ((secondFloorErr > firstFloorErr) && (Status_SF == "Online")) {
+      activeTemp = Temp_SF
+      activeRH = RH_SF
+      activeSP = Clg_SP_SF
+      activeSP_Htg = Htg_SP_SF
+      activeSP_Clg = Clg_SP_SF
+      activeZone = "Second Floor"
+    } else {
+      activeTemp = Temp_FF
+      activeRH = RH_FF
+      activeSP = Clg_SP_FF
+      activeSP_Htg = Htg_SP_FF
+      activeSP_Clg = Clg_SP_FF
+      activeZone = "First Floor"
+    }
+  } else {
+    if ((secondFloorErr < firstFloorErr) && (Status_SF == "Online")) {
+      activeTemp = Temp_SF
+      activeRH = RH_SF
+      activeSP = Htg_SP_SF
+      activeSP_Htg = Htg_SP_SF
+      activeSP_Clg = Clg_SP_SF
+      activeZone = "Second Floor"
+    } else {
+      activeTemp = Temp_FF
+      activeRH = RH_FF
+      activeSP = Htg_SP_FF
+      activeSP_Htg = Htg_SP_FF
+      activeSP_Clg = Clg_SP_FF
+      activeZone = "First Floor"
+    }
+  }
+
+  //logWarn("hvac.arb.rules", "Active Temp: " + activeTemp)
+  //logWarn("hvac.arb.rules", "Active SP: " + activeSP)
+  //logWarn("hvac.arb.rules", "Active Zone: " + activeZone)
+  //logWarn("hvac.arb.rules", "SF Status: " + Status_SF)
+  //logWarn("hvac.arb.rules", "FF Error: " + firstFloorErr)
+  //logWarn("hvac.arb.rules", "SF Error: " + secondFloorErr)
+
+
+  //Send active temperature value to thermostat.
+  //First update heartbeat and send to thermostat
+  //in order for thermostat to continue to used communicated
+  //temperature value.
+  //Next send the setpoints and active temperature as a payload
+  //so that everything can be evaluated by the thermostat at once.
+  //If values are sent individually, a race condition may occur.
+  if (mqttCounter >= 200) {
+    mqttCounter = 1
+  }
+  else
+  {
+    mqttCounter = mqttCounter + 1
+  }
+
+  mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">B=" + mqttCounter)
+  mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">P=\"" + activeSP_Htg + "," + activeSP_Clg + "," + activeTemp + "\"")
+  //mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">ab=" + mqttCounter)
+  //mqttActions.publishMQTT("cmnd/" + deviceID + "/Script", ">v=" + activeTemp)
+
+
+  //Update Item values
+  Active_Temp.postUpdate(activeTemp)
+  Active_RH.postUpdate(activeRH)
+  Active_Setpoint.postUpdate(activeSP)
+  Active_Zone.postUpdate(activeZone)
+  Active_Setpoint_Heat.postUpdate(activeSP_Htg)
+  Active_Setpoint_Cool.postUpdate(activeSP_Clg)
+end
+
+
+//rule "Heating Setpoint Update"
+//when
+//  System started or
+//  Item Active_Setpoint_Heat changed
+//then
+  //HVAC_Setpoint_Heat.sendCommand(Active_Setpoint_Heat.state)
+  //logWarn("hvac.htg.sp.rules", "HVAC Htg SP: " + Active_Setpoint_Heat.state)
+//end
+
+
+//rule "Cooling Setpoint Update"
+//when
+//  System started or
+//  Item Active_Setpoint_Cool changed
+//then
+  //HVAC_Setpoint_Cool.sendCommand(Active_Setpoint_Cool.state)
+  //logWarn("hvac.htg.sp.rules", "HVAC Htg SP: " + Active_Setpoint_Heat.state)
+//end
+
+
+
+//rule "Zone Updates"
+//when
+//  System started or
+//  Time cron "0/30 0/1 * 1/1 * ? *"
+//then
+
+//end
+
+
+
+
+rule "HVAC Filter Clock"
+when
+  System started or
+  Time cron "0/30 0/1 * 1/1 * ? *"
+then
+  var Number filterMn
+  var Number filterHr
+
+  if (HVAC_Status.state == 1 || HVAC_Status.state == 2 || HVAC_Status.state == 3) {
+    filterMn = ((HVAC_Filter_Minutes.state as DecimalType) + 0.5)
+    HVAC_Filter_Minutes.postUpdate(filterMn)
+
+    if (filterMn > 0) {
+      filterHr = filterMn / 60
+    } else {
+      filterHr = 0
+    }
+    HVAC_Filter_Hours.postUpdate(filterHr)
+  }
+end
+
+
+rule "HVAC Filter Confirm"
+when
+  System started or
+  Item HVAC_Filter_Reset changed
+then
+  if (HVAC_Filter_Reset.state == ON) {
+    HVAC_Filter_Reset_Request.postUpdate(ON)
+  }
+  if (HVAC_Filter_Reset.state == OFF) {
+    HVAC_Filter_Reset_Request.postUpdate(OFF)
+  }
+end
+
+
+
+rule "HVAC Filter Reset"
+when
+  Item HVAC_Filter_Reset_Confirm changed from OFF to ON
+then
+    HVAC_Filter_Minutes.postUpdate(0)
+    HVAC_Filter_Hours.postUpdate(0)
+    HVAC_Filter_Reset.postUpdate(OFF)
+    HVAC_Filter_Reset_Request.postUpdate(OFF)
+    HVAC_Filter_Reset_Confirm.postUpdate(OFF)
+end
+
