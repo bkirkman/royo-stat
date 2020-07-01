@@ -1,0 +1,59 @@
+//This is just a partial sitemap the includes the HVAC control
+    Text label="HVAC" icon="temperature" {
+        Frame label="Thermostat Settings" {
+            Selection item=HVAC_Mode mappings=[0="Off", 1="Heating", 2="Cooling", 3="Auto"]
+            Text item=HVAC_Status
+            Text item=Active_Temp
+            Text item=Active_Setpoint
+            Text item=Active_Zone
+            Setpoint item=HVAC_Setpoint_Heat_FF minValue=55.0 maxValue=80.0 step=0.5
+            Setpoint item=HVAC_Setpoint_Cool_FF minValue=60.0 maxValue=85.0 step=0.5
+            Setpoint item=HVAC_Setpoint_Heat_SF minValue=55.0 maxValue=80.0 step=0.5
+            Setpoint item=HVAC_Setpoint_Cool_SF minValue=60.0 maxValue=85.0 step=0.5
+            Text label="1st Floor Temperature" item=First_Floor_Temp
+            Text label="1st Floor Humidity" item=First_Floor_RH
+            Text label="2nd Floor Temperature" item=Second_Floor_Temp
+            Text label="2nd Floor Humidity" item=Second_Floor_RH
+            Text item=Temperature label="Outdoor Air Temp [%.2f °F]" icon=temperature
+            Text label="Schedule" icon="settings" {
+                Frame label="First Floor Home Settings" {
+                Setpoint label="Hour" item=HVAC_Timer_FF_Home_Hr minValue=0 maxValue=23 step=1
+                Setpoint label="Minute" item=HVAC_Timer_FF_Home_Min minValue=0 maxValue=59 step=1
+                Setpoint label="Heating" item=HVAC_Timer_FF_Home_SP_Heat minValue=55.0 maxValue=80.0 step=0.5
+                Setpoint label="Cooling" item=HVAC_Timer_FF_Home_SP_Cool minValue=60.0 maxValue=85.0 step=0.5
+                }
+                Frame label="First Floor Away Settings" {
+                Setpoint label="Hour" item=HVAC_Timer_FF_Away_Hr minValue=0 maxValue=23 step=1
+                Setpoint label="Minute" item=HVAC_Timer_FF_Away_Min minValue=0 maxValue=59 step=1
+                Setpoint label="Heating" item=HVAC_Timer_FF_Away_SP_Heat minValue=55.0 maxValue=80.0 step=0.5
+                Setpoint label="Cooling" item=HVAC_Timer_FF_Away_SP_Cool minValue=60.0 maxValue=85.0 step=0.5
+                }
+                Frame label="Second Floor Home Settings" {
+                Setpoint label="Hour" item=HVAC_Timer_SF_Home_Hr minValue=0 maxValue=23 step=1
+                Setpoint label="Minute" item=HVAC_Timer_SF_Home_Min minValue=0 maxValue=59 step=1
+                Setpoint label="Heating" item=HVAC_Timer_SF_Home_SP_Heat minValue=55.0 maxValue=80.0 step=0.5
+                Setpoint label="Cooling" item=HVAC_Timer_SF_Home_SP_Cool minValue=60.0 maxValue=85.0 step=0.5
+                }
+                Frame label="Second Floor Away Settings" {
+                Setpoint label="Hour" item=HVAC_Timer_SF_Away_Hr minValue=0 maxValue=23 step=1
+                Setpoint label="Minute" item=HVAC_Timer_SF_Away_Min minValue=0 maxValue=59 step=1
+                Setpoint label="Heating" item=HVAC_Timer_SF_Away_SP_Heat minValue=55.0 maxValue=80.0 step=0.5
+                Setpoint label="Cooling" item=HVAC_Timer_SF_Away_SP_Cool minValue=60.0 maxValue=85.0 step=0.5
+                }
+            }
+            Text label="Advanced Settings" icon="settings" {
+                Selection item=HVAC_Fan mappings=[0="Auto", 1="On"]
+                Setpoint item=HVAC_Deadband minValue=0.2 maxValue=4 step=0.1
+                Setpoint item=HVAC_Min_On_Heat minValue=0 maxValue=30 step=1
+                Setpoint item=HVAC_Min_Off_Heat minValue=0 maxValue=30 step=1
+                //Setpoint item=HVAC_Btwn_Sts_Heat minValue=0 maxValue=30 step=1
+                Setpoint item=HVAC_Min_On_Cool minValue=0 maxValue=30 step=1
+                Setpoint item=HVAC_Min_Off_Cool minValue=0 maxValue=30 step=1
+                //Setpoint item=HVAC_Btwn_Sts_Cool minValue=0 maxValue=30 step=1
+                Text item=HVAC_Filter_Hours
+                Switch item=HVAC_Filter_Reset
+                Switch item=HVAC_Filter_Reset_Confirm visibility=[HVAC_Filter_Reset_Request == ON]
+                Text item=Second_Floor_Sensor_Status
+           }
+       }
+    }
