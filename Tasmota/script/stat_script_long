@@ -1,0 +1,310 @@
+;;;;;This script is the long annotated version and is too long to upload to Tasmota.
+;;;;;It is here for documentation purposes. Use short script to upload to Tasmota.
+;ts_mode is themostat mode request (i.e. from app): 0=off, 1=heating, 2=cooling, 3=auto
+;ts_setpoint_ht is thermostat heating setpoint
+;ts_setpoint_cl is thermostat heating setpoint
+;ts_fan is thermostat fan control: 0=auto, 1=on
+;ts_deadband is thermostat deadband. HVAC system will be enabled/disabled 1/2-deadband above and below setpoint
+;ts_minOnHeat is thermostat minium heating on time to prevent short cycling
+;ts_minOffHeat is thermostat minimum heating off time to prevent short cycling
+;ts_minOnCool is thermostat minium cooling on time to prevent short cycling
+;ts_minOffCool is thermostat minimum cooling off time to prevent short cycling
+;auto_mode_active is the active mode considering auto-changeover
+;mode_status is thermostat mode status: 0=off, 1=heating, 2=cooling, 3=fan only, 4=stanby
+;sensor_active is arbitrated temp with sensor_remote being priority (sensor active)
+;payload is a string payload of "htg_sp,clg_sp,activeTemp" 
+;sensor_remote is temp sensor remote (sensor remote)
+;heartbt is heartbeat
+;payld_prev is previous payload
+;mode_sts_prev is the previous mode status on last program cycle
+;tmr_heatOn is heat-on timer
+;tmr_heatOff is heat-off timer
+;tmr_coolOn is cooling-on timer
+;tmr_coolOff is cooling-off timer
+;sensor_local is temp sensor local (sensor hardwired)
+;temp_compare compares temp to setpoint and sets less-than, greater-than, in-the-middle mode
+;chg_tsmode is flagged when the thermostat mode changes (delta ts_mode)
+;chg_timer is flagged when an anti-cycle timer expires
+;tmr_hrtbt is heartbeat timer
+;hrtbt_prev is previous heartbeat
+;half_deadband to save on space
+
+
+>D
+p:ts_mode=0
+p:ts_setpoint_ht=68
+p:ts_setpoint_cl=73
+p:ts_fan=0
+p:ts_deadband=1
+p:ts_minOnHeat=5
+p:ts_minOffHeat=5
+p:ts_minOnCool=5
+p:ts_minOffCool=5
+p:auto_mode_active=0
+mode_status=0
+sensor_active=70
+payload="68,73,70"
+sensor_remote=70
+heartbt=-1
+payld_prev="a"
+mode_sts_prev=0
+t:tmr_heatOn=-1
+t:tmr_heatOff=-1
+t:tmr_coolOn=-1
+t:tmr_coolOff=-1
+sensor_local=70
+temp_compare=2
+chg_tsmode=0
+chg_timer=0
+t:tmr_hrtbt=0
+hrtbt_prev=0
+half_deadband=1
+
+
+run_sc=0
+run_sp=0
+
+>T
+sensor_local=SI7021#Temperature
+
+>S
+run_sc=0
+run_sp=0
+;publish control point values once per minute
+if upsecs%60==0 {
+	run_sp=1
+}
+
+;reset timer expired variable
+chg_timer=0
+
+;flag change to ts_mode. Do this because chg[x] will be cleared once true, but we need it more than once.
+chg_tsmode=chg[ts_mode]
+
+;make update if anti-cycle timers expire and flag timer-expired variable
+if tmr_heatOn==0 {
+	tmr_heatOn=-1
+	chg_timer=1
+}
+if tmr_heatOff==0 {
+	tmr_heatOff=-1
+	chg_timer=1
+}
+if tmr_coolOn==0 {
+	tmr_coolOn=-1
+	chg_timer=1
+}
+if tmr_coolOff==0 {
+	tmr_coolOff=-1
+	chg_timer=1
+}
+
+
+;flag change to paylod. Do this because chg[x] will be cleared once true, but we need it more than once.
+if payload!=payld_prev {
+	ts_setpoint_ht=st(payload , 1)
+	ts_setpoint_cl=st(payload , 2)
+	sensor_remote=st(payload , 3)
+}
+
+payld_prev=payload
+
+
+;reset on/off timers if tstat switched off by user.
+if chg_tsmode>0
+and ts_mode==0 {
+	tmr_heatOn=-1
+	tmr_heatOff=-1
+	tmr_coolOn=-1
+	tmr_coolOff=-1
+}
+
+
+;run logic every teleperiod
+if upsecs%tper==0 {
+	;reset heartbeat timer on heartbeat counter change
+	if heartbt!=hrtbt_prev {
+		tmr_hrtbt=300
+	}
+	hrtbt_prev=heartbt
+	sensor_active=sensor_local
+
+	;update control logic
+	run_sc=1
+}
+
+
+;if heartbeat timer has not expired and heartbeat does not indicate a fault with a value of -1, then use remote sensor as temp sensor, else use local.
+if tmr_hrtbt>0
+and heartbt!=-1 {
+	sensor_active=sensor_remote
+}
+
+;make updates on control point updates
+;make updates on timer expirations
+if chg_tsmode>0
+or chg[ts_setpoint_ht]>0
+or chg[ts_setpoint_cl]>0
+or chg[sensor_remote]>0
+or chg[ts_deadband]>0
+or chg[ts_fan]>0
+or chg_timer>0
+or run_sc>0 {
+	=#sc(run_sp)
+} else {
+	if run_sp>0 {
+		=#sp
+	}
+}
+
+
+;publish control point values
+#sp
+=>Publish tele/myhome/hvac/tstat/TS {"M":"%0ts_mode%","H":"%ts_setpoint_ht%","C":"%ts_setpoint_cl%","D":"%ts_deadband%","F":"%0ts_fan%","OH":"%0ts_minOnHeat%","FH":"%0ts_minOffHeat%","OC":"%0ts_minOnCool%","FC":"%0ts_minOffCool%","A":"%0auto_mode_active%","S":"%0mode_status%","T":"%sensor_active%"}
+
+;;;**control outputs**
+#sc(param)
+;determine auto_mode_active on a mode change
+if chg_tsmode>0 {
+	;set auto_mode_active to thermostat ts_mode on a change
+	auto_mode_active=ts_mode
+	;if changed into auto mode, make mode determination based on setpoint vs mid-point of heating and cooling setpoints
+	if ts_mode==3 {
+		auto_mode_active=1
+		if sensor_active>((ts_setpoint_ht+ts_setpoint_cl)/2) {
+			auto_mode_active=2
+		}
+	}
+}
+
+
+;declare half_deadband variable to reduce character total of script
+half_deadband=ts_deadband/2
+
+;make sure setpoints are spread
+;spread heating setpoints when in cooling mode
+if auto_mode_active==2 {
+	if ts_setpoint_ht>ts_setpoint_cl-ts_deadband-1 {
+		ts_setpoint_ht=ts_setpoint_cl-ts_deadband-1
+	}
+} else {
+	;spead cooling setpoint when not in cooling mode
+	if ts_setpoint_cl<ts_setpoint_ht+ts_deadband+1 {
+		ts_setpoint_cl=ts_setpoint_ht+ts_deadband+1
+	} 
+}
+
+;if selected mode is auto, toggle heat/cool mode when going below/above setpoint -/+ deadband
+;if temp is inbetween, it will have been set forced into initial mode on change to auto in logic above
+if ts_mode==3 {
+	if sensor_active<ts_setpoint_ht-half_deadband {
+		auto_mode_active=1
+	}
+	if sensor_active>ts_setpoint_cl+half_deadband {
+		auto_mode_active=2
+	}
+}
+
+;compare temp vs setpoint for heating and cooling setpoints
+;below heating setpoint minus 1/2-of-deadband
+temp_compare=1
+
+;in the heating deadband
+if sensor_active>ts_setpoint_ht-half_deadband {
+	temp_compare=2
+}
+
+;above heating setpoint plus 1/2-of-deadband
+;most likely below cooling setpoint minus 1/2-of-deadband
+if sensor_active>ts_setpoint_ht+half_deadband {
+	temp_compare=3
+}
+
+;in the cooling deadband
+if sensor_active>ts_setpoint_cl-half_deadband {
+	temp_compare=4
+}
+
+;above cooling setpoint plus 1/2-of-deadband
+if sensor_active>ts_setpoint_cl+half_deadband {
+	temp_compare=5
+}
+
+
+;determine H/C mode status
+;store previous status to determine below if an off timer should be started
+mode_sts_prev=mode_status
+
+;start in standby
+mode_status=4
+
+;switch to off is mode is off
+if ts_mode==0 {
+	mode_status=0
+}
+
+;determine if heating should run if heating mode is active
+;minimum off timer must be expired
+;if previous mode was heat and (temp is less than setpoint or in deadband or minimum on-timer has not expired) then run heat
+if auto_mode_active==1
+and tmr_heatOff<=0
+and ((mode_sts_prev==1 and (temp_compare==1 or temp_compare==2 or tmr_heatOn>0)) or (mode_sts_prev!=1 and temp_compare==1)) {
+	mode_status=1
+}
+
+;determine if cooling should run if cooling mode is active
+;similar to logic above
+if auto_mode_active==2
+and tmr_coolOff<=0
+and ((mode_sts_prev==2 and (temp_compare==5 or temp_compare==4 or tmr_coolOn>0)) or (mode_sts_prev!=2 and temp_compare==5)) {
+	mode_status=2
+}
+
+;enable fan if in manual mode, even when HVAC_Mode is off
+if (ts_fan==1 and (mode_status==0 or mode_status==4)) {
+	mode_status=3
+}
+
+;make changes on mode change
+if mode_status!=mode_sts_prev {
+	;start min off timers
+	if mode_sts_prev==1 {
+		tmr_heatOff=ts_minOffHeat*60
+	}
+	if mode_sts_prev==2 {
+		tmr_coolOff=ts_minOffCool*60
+	}
+
+	;start min on timers
+	;start between-start timers
+	;control heating output
+	if mode_status==1 {
+		tmr_heatOn=ts_minOnHeat*60
+		=>power1 1
+	} else {
+		=>power1 0
+	}
+
+	;control cooling output
+	if mode_status==2 {
+		tmr_coolOn=ts_minOnCool*60
+		=>power2 1
+	} else {
+		=>power2 0
+	}
+
+	;control fan output
+	if mode_status==2
+	or mode_status==3 {
+		=>power3 1
+	} else {
+		=>power3 0
+	}
+
+	;republish if status changed
+	=#sp
+} else {
+	if param>0 {
+		=#sp
+	}
+}
